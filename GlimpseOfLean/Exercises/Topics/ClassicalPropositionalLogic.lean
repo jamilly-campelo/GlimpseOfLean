@@ -58,18 +58,27 @@ variable {v : Variable → Prop} {A B : Formula}
 @[simp] lemma isTrue_neg : IsTrue v ~A ↔ ¬ IsTrue v A := by simp [neg]
 
 @[simp] lemma isTrue_top : IsTrue v ⊤ := by {
-  sorry
+  simp [top]
 }
 
 @[simp] lemma isTrue_equiv : IsTrue v (A ⇔ B) ↔ (IsTrue v A ↔ IsTrue v B) := by {
-  sorry
+  unfold equiv
+  simp [IsTrue]
+  constructor
+  · intro ⟨h₁, h₂⟩
+    constructor
+    exact h₁
+    exact h₂
+  · intro ⟨h₁, h₂⟩
+    exact ⟨h₁, h₂⟩
 }
 
 /- As an exercise, let's prove (using classical logic) the double negation elimination principle.
   `by_contra h` might be useful to prove something by contradiction. -/
 
 example : Valid (~~A ⇔ A) := by {
-  sorry
+  intros v h
+  simp
 }
 
 @[simp] lemma satisfies_insert_iff : Satisfies v (insert A Γ) ↔ IsTrue v A ∧ Satisfies v Γ := by {
@@ -131,7 +140,15 @@ example : insert A (insert B ∅) ⊢ A && B := by
   exact andI (by apply_ax) (by apply_ax)
 
 example : Provable (~~A ⇔ A) := by {
-  sorry
+  apply andI
+  · apply impI
+    apply botC
+    apply impE _ (by apply_ax)
+    apply_ax
+  · apply impI
+    apply impI
+    apply impE (by apply_ax)
+    apply_ax
 }
 
 /- Optional exercise: prove the law of excluded middle. -/
@@ -202,4 +219,3 @@ theorem valid_of_provable (h : Provable A) : Valid A := by {
 -/
 
 end ClassicalPropositionalLogic
-
