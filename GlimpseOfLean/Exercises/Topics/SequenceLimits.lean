@@ -24,11 +24,11 @@ Let's prove some exercises using `linarith`.
 -/
 
 example (a b : ℝ) (ha : 0 ≤ a) (hb : 0 ≤ b) : 0 ≤ a + b := by {
-  sorry
+  linarith
 }
 
 example (a b c d : ℝ) (hab : a ≤ b) (hcd : c ≤ d) : a + c ≤ b + d := by {
-  sorry
+  linarith
 }
 
 /-
@@ -65,7 +65,13 @@ where `by linarith` will provide the proof of `δ/2 > 0` expected by Lean.
 /- If u is constant with value l then u tends to l.
 Hint: `simp` can rewrite `|l - l|` to `0` -/
 example (h : ∀ n, u n = l) : seq_limit u l := by {
-  sorry
+  unfold seq_limit
+  intros ε hε
+  use 0
+  intro n hn
+  rw [h]
+  simp
+  linarith
 }
 
 
@@ -87,7 +93,15 @@ or the primed version:
 -- Assume `l > 0`. Then `u` ts to `l` implies `u n ≥ l/2` for large enough `n`
 example (h : seq_limit u l) (hl : l > 0) :
     ∃ N, ∀ n ≥ N, u n ≥ l/2 := by {
-  sorry
+  unfold seq_limit at h
+  specialize h (l/2) (by linarith)
+  obtain ⟨N, hN⟩ := h
+  use N
+  intro n hn
+  apply hN at hn
+  rw [abs_le] at hn
+  have h₂: u n ≥ l / 2 := by linarith [hn.1]
+  exact h₂
 }
 
 
@@ -116,7 +130,7 @@ example (hu : seq_limit u l) (hv : seq_limit v l') :
   rcases hn with ⟨_hn₁, hn₂⟩
   have fact₁ : |u n - l| ≤ ε/2 := hN₁ n (by linarith)
   have fact₂ : |v n - l'| ≤ ε/2 := hN₂ n (by linarith)
-  
+
   calc
     |(u + v) n - (l + l')| = |u n + v n - (l + l')|   := rfl
     _ = |(u n - l) + (v n - l')|                      := by ring
@@ -128,7 +142,34 @@ example (hu : seq_limit u l) (hv : seq_limit v l') :
 /- Let's do something similar: the squeezing theorem. -/
 example (hu : seq_limit u l) (hw : seq_limit w l) (h : ∀ n, u n ≤ v n) (h' : ∀ n, v n ≤ w n) :
     seq_limit v l := by {
-  sorry
+  intros ε hε
+  unfold seq_limit at hu hw
+  obtain ⟨N₁, hN₁⟩ := hu ε hε
+  obtain ⟨N₂, hN₂⟩ := hw ε hε
+
+  use max N₁ N₂
+  intro n hn
+
+  rw [ge_max_iff] at hn
+  rcases hn with ⟨hn₁, hn₂⟩
+
+  have huε := hN₁ n hn₁
+  have hwε := hN₂ n hn₂
+
+  have huv := h n
+  have hvw := h' n
+
+  rw [abs_le]
+  rw [abs_le] at huε
+  rw [abs_le] at hwε
+
+  constructor
+  calc
+    -ε ≤ u n - l := by linarith
+     _ ≤ v n - l := by linarith
+  calc
+    v n - l ≤ w n - l := by linarith
+          _ ≤ ε       := by linarith
 }
 
 
@@ -143,7 +184,25 @@ Recall we listed three variations on the triangle inequality at the beginning of
 -- A sequence admits at most one limit. You will be able to use that lemma in the following
 -- exercises.
 lemma unique_limit : seq_limit u l → seq_limit u l' → l = l' := by {
-  sorry
+  unfold seq_limit
+  intros hl hl'
+  apply eq_of_abs_sub_le_all
+  intros ε hε
+
+  rcases hl (ε/2) (by linarith) with ⟨N₁, hlε⟩
+  rcases hl' (ε/2) (by linarith) with ⟨N₂, hl'ε⟩
+
+  have N₁_max : max N₁ N₂ ≥ N₁ := by exact le_max_left _ _
+  have N₂_max : max N₁ N₂ ≥ N₂ := by exact le_max_right _ _
+
+  apply hlε at N₁_max
+  apply hl'ε  at N₂_max
+
+  calc
+    |l - l'| ≤ |l - u (max N₁ N₂)| + |u (max N₁ N₂) - l'| := by apply abs_sub_le
+          _ ≤ |u (max N₁ N₂) - l| + |u (max N₁ N₂) - l'| := by rw [abs_sub_comm (u (max N₁ N₂)) l]
+          _ ≤ ε/2 + ε/2 := by linarith
+          _ ≤ ε := by linarith
 }
 
 
@@ -158,7 +217,30 @@ def is_seq_sup (M : ℝ) (u : ℕ → ℝ) :=
 (∀ n, u n ≤ M) ∧ ∀ ε > 0, ∃ n₀, u n₀ ≥ M - ε
 
 example (M : ℝ) (h : is_seq_sup M u) (h' : non_decreasing u) : seq_limit u M := by {
-  sorry
+  unfold is_seq_sup at h
+  unfold non_decreasing at h'
+  unfold seq_limit
+
+  intro ε hε
+  rcases h with ⟨h₁, h₂⟩
+  specialize h₂ ε hε
+  obtain ⟨n₀, hn₀⟩ := h₂
+  use n₀
+  intro n hn
+  have h₃ := h' n₀ n hn
+
+  rw [abs_le]
+
+  constructor
+  · have h₄ : -ε ≤ u n₀ - M := by linarith
+    calc
+      -ε ≤ u n₀ - M := by linarith
+       _ ≤ u n - M  := by linarith
+  · have h₄ : u n ≤ M := by linarith [h₁ n]
+    calc
+      u n - M ≤ M - M := by linarith
+            _ ≤ 0     := by linarith
+            _ ≤ ε     := by linarith
 }
 
 /-
@@ -194,7 +276,13 @@ In the exercise, we use `∃ n ≥ N, ...` which is the abbreviation of
 /-- Extractions take arbitrarily large values for arbitrarily large
 inputs. -/
 lemma extraction_ge : extraction φ → ∀ N N', ∃ n ≥ N', φ n ≥ N := by {
-  sorry
+  intros hyp N N'
+  use max N N'
+  constructor
+  exact le_max_right _ _
+  calc
+    φ (max N N') ≥ max N N' := by exact id_le_extraction' hyp (max N N')
+                _ ≥ N       := by exact le_max_left _ _
 }
 
 /- A real number `a` is a cluster point of a sequence `u`
@@ -237,4 +325,3 @@ In the next exercise, you can reuse
 
 example (hu : CauchySequence u) (hl : cluster_point u l) : seq_limit u l := by
   sorry
-
