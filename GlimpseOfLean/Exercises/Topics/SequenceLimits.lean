@@ -295,19 +295,89 @@ def cluster_point (u : ℕ → ℝ) (a : ℝ) := ∃ φ, extraction φ ∧ seq_l
 `u` arbitrarily close to `a` for arbitrarily large input. -/
 lemma near_cluster :
   cluster_point u a → ∀ ε > 0, ∀ N, ∃ n ≥ N, |u n - a| ≤ ε := by {
-  sorry
+  intros h ε hε N
+  unfold cluster_point at h
+
+  obtain ⟨φ, hφ⟩ := h
+  rcases hφ with ⟨hφ₁, hφ₂⟩
+
+  unfold extraction at hφ₁
+  unfold seq_limit at hφ₂
+
+  specialize hφ₂ ε hε
+  obtain ⟨N₁, hN₁⟩ := hφ₂
+
+  obtain ⟨n, hn₁, hn₂⟩ := extraction_ge hφ₁ N N₁
+
+  specialize hN₁ n hn₁
+  use φ n
+
+  constructor
+  · exact hn₂
+  · exact hN₁
+
+  /-
+  let N_max := N + N₁ + 1
+  use N
+
+  constructor
+  linarith
+  have h₂ : N_max > N :=
+  calc
+    N_max = N + N₁ + 1 := by rfl
+        _ > N         := by linarith
+  have h₃ : N_max ≥ N₁ :=
+  calc
+    N_max = N + N₁ + 1 := by rfl
+        _ ≥ N₁         := by linarith
+
+  specialize hN₁ N_max h₃
+  specialize hφ₁ N N_max h₂
+
+  let φ₁ := φ N_max
+
+  calc
+    |u N - a| ≤ |(u ∘ φ) N - a|     := by extraction_ge
+            _ < |(u ∘ φ) N_max - a| := by hφ₁
+            _ ≤ ε                   := by hN₁
+  -/
 }
 
 
 /-- If `u` tends to `l` then its subsequences tend to `l`. -/
 lemma subseq_tendsto_of_tendsto' (h : seq_limit u l) (hφ : extraction φ) :
 seq_limit (u ∘ φ) l := by {
-  sorry
+  unfold seq_limit at h
+  unfold extraction at hφ
+  unfold seq_limit
+
+  intros ε hε
+  specialize h ε hε
+
+  obtain ⟨N, hN⟩ := h
+  use N
+
+  intro n hn
+  apply hN
+
+  calc
+    N ≤ n := hn
+    _ ≤ φ n := id_le_extraction' hφ n
 }
 
 /-- If `u` tends to `l` all its cluster points are equal to `l`. -/
 lemma cluster_limit (hl : seq_limit u l) (ha : cluster_point u a) : a = l := by {
-  sorry
+  unfold seq_limit at hl
+  unfold cluster_point at ha
+
+  obtain ⟨φ, hφ⟩ := ha
+  rcases hφ with ⟨hφ₁, hφ₂⟩
+
+  unfold extraction at hφ₁
+  unfold seq_limit at hφ₂
+
+  have h : seq_limit (u ∘ φ) l := subseq_tendsto_of_tendsto' hl hφ₁
+  exact unique_limit hφ₂ h
 }
 
 /-- Cauchy_sequence sequence -/
@@ -315,7 +385,26 @@ def CauchySequence (u : ℕ → ℝ) :=
   ∀ ε > 0, ∃ N, ∀ p q, p ≥ N → q ≥ N → |u p - u q| ≤ ε
 
 example : (∃ l, seq_limit u l) → CauchySequence u := by {
-  sorry
+  intro h
+  unfold seq_limit at h
+  unfold CauchySequence
+
+  intro ε hε
+  obtain ⟨l, hl⟩ := h
+
+  specialize hl (ε/2) (by linarith)
+  obtain ⟨N, hN⟩ := hl
+
+  use N
+  intros p q hp hq
+
+  have hNp : |u p - l| ≤ ε/2 := hN p hp
+  have hNq : |u q - l| ≤ ε/2 := hN q hq
+
+  calc
+    |u p - u q| ≤ |u p - l| + |u q - l| := by exact abs_sub_le' (u p) l (u q)
+              _ ≤ ε/2 + ε/2             := add_le_add hNp hNq
+              _ ≤ ε                     := by linarith
 }
 
 /-
@@ -323,5 +412,32 @@ In the next exercise, you can reuse
  near_cluster : cluster_point u a → ∀ ε > 0, ∀ N, ∃ n ≥ N, |u n - a| ≤ ε
 -/
 
-example (hu : CauchySequence u) (hl : cluster_point u l) : seq_limit u l := by
-  sorry
+example (hu : CauchySequence u) (hl : cluster_point u l) : seq_limit u l := by {
+  have hcp : ∀ ε > 0, ∀ N, ∃ n ≥ N, |u n - l| ≤ ε := near_cluster hl
+
+  unfold CauchySequence at hu
+  unfold cluster_point at hl
+  unfold seq_limit
+
+  obtain ⟨φ, hφ₁, hφ₂⟩ := hl
+  intro ε hε
+
+  specialize hu (ε/2) (by linarith)
+  obtain ⟨N, hN⟩ := hu
+
+  specialize hcp (ε/2) (by linarith)
+  specialize hcp N
+
+  obtain ⟨n, hn, hn₁⟩ := hcp
+
+  use N
+
+  intros n₂ hn₂
+
+  have hnn : |u n₂ - u n| ≤ ε / 2 := hN n₂ n hn₂ hn
+
+  calc
+    |u n₂ - l| ≤ |u n₂ - u n| + |u n - l| := by exact abs_sub_le (u n₂) (u n) l
+             _ ≤ ε/2 + ε/2                := add_le_add hnn hn₁
+             _ ≤ ε                        := by linarith
+}
